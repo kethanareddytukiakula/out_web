@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "../../context/AuthContext";
 import { BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, XAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { Activity, Clock, DollarSign, MapPin, TrendingUp, ChevronRight, Settings, Shield, Bell, HelpCircle, LogOut, Zap, Camera } from "lucide-react";
 
@@ -40,9 +42,11 @@ const CustomTooltip = ({ active, payload, label }: any) => active && payload?.le
 ) : null;
 
 export function ProfileScreen() {
+  const navigate = useNavigate();
   const [tab, setTab] = useState<Tab>("profile");
   const [safetyOn, setSafetyOn] = useState(false);
   const [sosPressed, setSosPressed] = useState(false);
+  const { currentUser, logout } = useAuth();
 
   const tabGrads: Record<Tab, string> = {
     profile: "from-[#f72585] to-[#c026d3]",
@@ -75,14 +79,16 @@ export function ProfileScreen() {
             <div className="rounded-2xl p-5 text-center relative overflow-hidden" style={{ background: 'linear-gradient(135deg, #1a0530, #0d0d1a)', border: '1px solid rgba(247,37,133,0.2)' }}>
               <div className="absolute inset-0" style={{ background: 'radial-gradient(ellipse at 50% -10%, rgba(247,37,133,0.1) 0%, transparent 60%)' }} />
               <div className="relative inline-block mb-3">
-                <div className="w-16 h-16 rounded-2xl flex items-center justify-center text-xl text-white mx-auto" style={{ background: 'linear-gradient(135deg, #f72585, #7209b7)', fontFamily: 'var(--font-display)', fontWeight: 900 }}>AS</div>
+                <div className="w-16 h-16 rounded-2xl flex items-center justify-center text-xl text-white mx-auto" style={{ background: 'linear-gradient(135deg, #f72585, #7209b7)', fontFamily: 'var(--font-display)', fontWeight: 900 }}>
+                  {currentUser ? currentUser.name.split(' ').map(n => n[0]).slice(0,2).join('') : 'AS'}
+                </div>
                 <button className="absolute -bottom-1 -right-1 w-6 h-6 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #c026d3, #7209b7)', border: '2px solid #0d0d1a' }}>
                   <Camera size={11} className="text-white" />
                 </button>
               </div>
-              <h3 className="text-white" style={{ fontFamily: 'var(--font-display)', fontWeight: 900 }}>Arjun Singh</h3>
-              <p className="text-xs mt-0.5" style={{ color: '#8888aa' }}>21CSE045 · CSE, 3rd Year</p>
-              <p className="text-xs mt-1" style={{ color: '#c026d3', fontWeight: 600 }}>arjun.singh@university.edu</p>
+              <h3 className="text-white" style={{ fontFamily: 'var(--font-display)', fontWeight: 900 }}>{currentUser ? currentUser.name : 'Arjun Singh'}</h3>
+              <p className="text-xs mt-0.5" style={{ color: '#8888aa' }}>{currentUser ? `${currentUser.regNo} · ${currentUser.course}, ${currentUser.year}` : '21CSE045 · CSE, 3rd Year'}</p>
+              <p className="text-xs mt-1" style={{ color: '#c026d3', fontWeight: 600 }}>{currentUser ? currentUser.email : 'arjun.singh@university.edu'}</p>
               <div className="flex justify-center gap-4 mt-4 pt-4" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
                 {[{ v: "47", l: "Outings" }, { v: "23", l: "Places" }, { v: "128h", l: "Hours" }].map(s => (
                   <div key={s.l} className="text-center">
@@ -111,7 +117,7 @@ export function ProfileScreen() {
                   <ChevronRight size={12} style={{ color: '#8888aa' }} />
                 </button>
               ))}
-              <button className="w-full flex items-center gap-3 px-4 py-3" style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}>
+              <button onClick={async () => { try { await logout(); navigate("/login", { replace: true }); } catch (err) { console.error(err); } }} className="w-full flex items-center gap-3 px-4 py-3" style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}>
                 <LogOut size={14} style={{ color: '#f72585' }} />
                 <span className="text-sm" style={{ color: '#f72585', fontWeight: 600 }}>Sign Out</span>
               </button>
