@@ -32,45 +32,21 @@ const achievements = [
   { title: "Early Bird", desc: "5 morning outings", icon: "🌅", earned: true },
 ];
 
-type Tab = "profile" | "analytics" | "safety";
-
-const CustomTooltip = ({ active, payload, label }: any) => active && payload?.length ? (
-  <div style={{ background: '#1e1e35', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, padding: '8px 12px', fontSize: 12 }}>
-    <p style={{ color: '#8888aa' }}>{label}</p>
-    <p style={{ color: '#f72585', fontWeight: 800 }}>₹{payload[0].value}</p>
-  </div>
-) : null;
+type Tab = "profile";
 
 export function ProfileScreen() {
   const navigate = useNavigate();
   const [tab, setTab] = useState<Tab>("profile");
-  const [safetyOn, setSafetyOn] = useState(false);
-  const [sosPressed, setSosPressed] = useState(false);
-  const { currentUser, logout } = useAuth();
+  const { currentUser, logout, loading } = useAuth();
 
   const tabGrads: Record<Tab, string> = {
     profile: "from-[#f72585] to-[#c026d3]",
-    analytics: "from-[#7209b7] to-[#4361ee]",
-    safety: "from-[#ff6b35] to-[#f72585]",
   };
 
   return (
     <div className="h-full overflow-y-auto p-6" style={{ background: '#0d0d1a' }}>
       <div className="flex items-center justify-between mb-5">
         <h2 style={{ fontFamily: 'var(--font-display)', fontWeight: 900, fontSize: 20, color: '#f0f0ff' }}>My Profile ⚡</h2>
-        <div className="flex rounded-xl p-1 gap-1" style={{ background: 'rgba(255,255,255,0.06)' }}>
-          {(["profile", "analytics", "safety"] as Tab[]).map(t => (
-            <button key={t} onClick={() => setTab(t)}
-              className="px-4 py-1.5 rounded-lg text-sm capitalize transition-all"
-              style={tab === t ? { background: `linear-gradient(135deg, var(--from), var(--to))`, color: 'white', fontFamily: 'var(--font-display)', fontWeight: 800 } : { color: '#8888aa' }}>
-              {tab === t ? (
-                <span className={`bg-gradient-to-r ${tabGrads[t]} bg-clip-text`} style={{ WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', fontFamily: 'var(--font-display)', fontWeight: 800 }}>
-                  {t.charAt(0).toUpperCase() + t.slice(1)}
-                </span>
-              ) : t.charAt(0).toUpperCase() + t.slice(1)}
-            </button>
-          ))}
-        </div>
       </div>
 
       {tab === "profile" && (
@@ -80,15 +56,15 @@ export function ProfileScreen() {
               <div className="absolute inset-0" style={{ background: 'radial-gradient(ellipse at 50% -10%, rgba(247,37,133,0.1) 0%, transparent 60%)' }} />
               <div className="relative inline-block mb-3">
                 <div className="w-16 h-16 rounded-2xl flex items-center justify-center text-xl text-white mx-auto" style={{ background: 'linear-gradient(135deg, #f72585, #7209b7)', fontFamily: 'var(--font-display)', fontWeight: 900 }}>
-                  {currentUser ? currentUser.name.split(' ').map(n => n[0]).slice(0,2).join('') : 'AS'}
+                  {loading ? '...' : (currentUser ? currentUser.name.split(' ').map(n => n[0]).slice(0,2).join('') : 'AS')}
                 </div>
                 <button className="absolute -bottom-1 -right-1 w-6 h-6 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #c026d3, #7209b7)', border: '2px solid #0d0d1a' }}>
                   <Camera size={11} className="text-white" />
                 </button>
               </div>
-              <h3 className="text-white" style={{ fontFamily: 'var(--font-display)', fontWeight: 900 }}>{currentUser ? currentUser.name : 'Arjun Singh'}</h3>
-              <p className="text-xs mt-0.5" style={{ color: '#8888aa' }}>{currentUser ? `${currentUser.regNo} · ${currentUser.course}, ${currentUser.year}` : '21CSE045 · CSE, 3rd Year'}</p>
-              <p className="text-xs mt-1" style={{ color: '#c026d3', fontWeight: 600 }}>{currentUser ? currentUser.email : 'arjun.singh@university.edu'}</p>
+              <h3 className="text-white" style={{ fontFamily: 'var(--font-display)', fontWeight: 900 }}>{loading ? 'Loading...' : (currentUser?.name ?? 'Arjun Singh')}</h3>
+              <p className="text-xs mt-0.5" style={{ color: '#8888aa' }}>{loading ? 'Loading...' : (currentUser ? `${currentUser.regNo} · ${currentUser.course}, ${currentUser.year}` : '21CSE045 · CSE, 3rd Year')}</p>
+              <p className="text-xs mt-1" style={{ color: '#c026d3', fontWeight: 600 }}>{loading ? 'Loading...' : (currentUser?.email ?? 'arjun.singh@university.edu')}</p>
               <div className="flex justify-center gap-4 mt-4 pt-4" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
                 {[{ v: "47", l: "Outings" }, { v: "23", l: "Places" }, { v: "128h", l: "Hours" }].map(s => (
                   <div key={s.l} className="text-center">
@@ -158,174 +134,6 @@ export function ProfileScreen() {
           </div>
         </div>
       )}
-
-      {tab === "analytics" && (
-        <div className="space-y-5">
-          <div className="grid grid-cols-4 gap-4">
-            {[
-              { label: "Avg Duration", value: "2h 43m", icon: Clock, grad: "from-[#4361ee] to-[#4cc9f0]", glow: "rgba(67,97,238,0.2)" },
-              { label: "Longest Outing", value: "5h 20m", icon: Zap, grad: "from-[#f72585] to-[#c026d3]", glow: "rgba(247,37,133,0.2)" },
-              { label: "Avg Spend/Outing", value: "₹166", icon: DollarSign, grad: "from-[#06d6a0] to-[#4cc9f0]", glow: "rgba(6,214,160,0.2)" },
-              { label: "Best Day", value: "Saturday", icon: TrendingUp, grad: "from-[#ff6b35] to-[#f72585]", glow: "rgba(255,107,53,0.2)" },
-            ].map(k => (
-              <div key={k.label} className="rounded-2xl p-4" style={{ background: '#16162a', border: '1px solid rgba(255,255,255,0.06)', boxShadow: `0 4px 16px ${k.glow}` }}>
-                <div className={`w-9 h-9 rounded-xl flex items-center justify-center bg-gradient-to-br ${k.grad} mb-2`}>
-                  <k.icon size={16} className="text-white" />
-                </div>
-                <p className="text-white text-xl leading-none mb-1" style={{ fontFamily: 'var(--font-display)', fontWeight: 900 }}>{k.value}</p>
-                <p className="text-xs" style={{ color: '#8888aa' }}>{k.label}</p>
-              </div>
-            ))}
-          </div>
-
-          <div className="grid grid-cols-3 gap-4">
-            <div className="col-span-2 rounded-2xl p-5" style={{ background: '#16162a', border: '1px solid rgba(255,255,255,0.06)' }}>
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <p className="text-white text-sm" style={{ fontFamily: 'var(--font-display)', fontWeight: 800 }}>Weekly Spending 💸</p>
-                  <p className="text-xs" style={{ color: '#8888aa' }}>This week</p>
-                </div>
-                <p style={{ fontFamily: 'var(--font-display)', fontWeight: 900, fontSize: 20, background: 'linear-gradient(90deg, #f72585, #c026d3)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>₹2,830</p>
-              </div>
-              <ResponsiveContainer width="100%" height={160}>
-                <BarChart data={weeklySpend} barSize={32}>
-                  <defs>
-                    <linearGradient id="barGrad2" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#f72585" />
-                      <stop offset="100%" stopColor="#7209b7" />
-                    </linearGradient>
-                  </defs>
-                  <XAxis dataKey="day" tick={{ fontSize: 11, fill: '#8888aa' }} axisLine={false} tickLine={false} />
-                  <Tooltip content={<CustomTooltip />} />
-                  <Bar dataKey="amount" fill="url(#barGrad2)" radius={[8, 8, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-
-            <div className="rounded-2xl p-5" style={{ background: '#16162a', border: '1px solid rgba(255,255,255,0.06)' }}>
-              <p className="text-sm text-white mb-4" style={{ fontFamily: 'var(--font-display)', fontWeight: 800 }}>Spend by Category 🥧</p>
-              <div className="flex justify-center mb-3">
-                <ResponsiveContainer width={120} height={120}>
-                  <PieChart>
-                    <Pie data={spendingByCategory} cx="50%" cy="50%" innerRadius={35} outerRadius={55} paddingAngle={3} dataKey="value">
-                      {spendingByCategory.map((entry, i) => <Cell key={i} fill={entry.color} />)}
-                    </Pie>
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
-              <div className="space-y-1.5">
-                {spendingByCategory.map(cat => (
-                  <div key={cat.name} className="flex items-center justify-between">
-                    <div className="flex items-center gap-1.5">
-                      <div className="w-2 h-2 rounded-full" style={{ background: cat.color, boxShadow: `0 0 4px ${cat.color}` }} />
-                      <span className="text-xs" style={{ color: '#8888aa' }}>{cat.name}</span>
-                    </div>
-                    <span className="text-xs text-white" style={{ fontWeight: 700 }}>₹{cat.value.toLocaleString()}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          <div className="rounded-2xl p-5" style={{ background: '#16162a', border: '1px solid rgba(255,255,255,0.06)' }}>
-            <p className="text-sm text-white mb-4" style={{ fontFamily: 'var(--font-display)', fontWeight: 800 }}>Monthly Outing Frequency 📈</p>
-            <ResponsiveContainer width="100%" height={120}>
-              <LineChart data={monthlyOutings}>
-                <defs>
-                  <linearGradient id="lineGrad" x1="0" y1="0" x2="1" y2="0">
-                    <stop offset="0%" stopColor="#f72585" />
-                    <stop offset="100%" stopColor="#4cc9f0" />
-                  </linearGradient>
-                </defs>
-                <XAxis dataKey="month" tick={{ fontSize: 11, fill: '#8888aa' }} axisLine={false} tickLine={false} />
-                <Tooltip contentStyle={{ background: '#1e1e35', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, fontSize: 12 }} />
-                <Line type="monotone" dataKey="count" stroke="url(#lineGrad)" strokeWidth={3} dot={{ r: 4, fill: '#f72585', strokeWidth: 0 }} />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-      )}
-
-      {tab === "safety" && (
-        <div className="grid grid-cols-3 gap-5">
-          <div className="space-y-4">
-            <div className="rounded-2xl p-6 flex flex-col items-center" style={{ background: 'linear-gradient(135deg, #1a0a0a, #0d0d1a)', border: '1px solid rgba(255,77,77,0.2)', boxShadow: '0 4px 24px rgba(255,77,77,0.1)' }}>
-              <p className="text-sm text-white mb-4" style={{ fontFamily: 'var(--font-display)', fontWeight: 800 }}>Emergency SOS 🆘</p>
-              <button
-                onMouseDown={() => setSosPressed(true)} onMouseUp={() => setSosPressed(false)} onMouseLeave={() => setSosPressed(false)}
-                className={`w-28 h-28 rounded-full flex flex-col items-center justify-center transition-all mb-3 ${sosPressed ? 'scale-90' : 'scale-100 hover:scale-105'}`}
-                style={{ background: 'linear-gradient(135deg, #ff4d4d, #c00)', boxShadow: sosPressed ? '0 0 0 16px rgba(255,77,77,0.25)' : '0 0 0 8px rgba(255,77,77,0.12)' }}>
-                <span className="text-3xl">🆘</span>
-                <span className="text-white text-sm mt-1" style={{ fontFamily: 'var(--font-display)', fontWeight: 900 }}>SOS</span>
-              </button>
-              <p className="text-xs text-center" style={{ color: '#8888aa' }}>Hold to alert contacts & campus security</p>
-            </div>
-
-            <div className="rounded-2xl p-4" style={{ background: '#16162a', border: '1px solid rgba(255,255,255,0.06)' }}>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: 'rgba(6,214,160,0.15)' }}>
-                    <MapPin size={15} style={{ color: '#06d6a0' }} />
-                  </div>
-                  <div>
-                    <p className="text-sm text-white" style={{ fontWeight: 600 }}>Live Location</p>
-                    <p className="text-xs" style={{ color: safetyOn ? '#06d6a0' : '#8888aa' }}>{safetyOn ? "Sharing with 3 contacts ✓" : "Off"}</p>
-                  </div>
-                </div>
-                <button onClick={() => setSafetyOn(p => !p)}
-                  className="w-11 h-6 rounded-full relative transition-colors"
-                  style={{ background: safetyOn ? '#06d6a0' : 'rgba(255,255,255,0.1)' }}>
-                  <div className="w-4 h-4 rounded-full bg-white absolute top-1 transition-all" style={{ left: safetyOn ? 26 : 4 }} />
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <div className="rounded-2xl p-5" style={{ background: '#16162a', border: '1px solid rgba(255,255,255,0.06)' }}>
-            <p className="text-sm text-white mb-4" style={{ fontFamily: 'var(--font-display)', fontWeight: 800 }}>Safe Routes 🗺️</p>
-            {[
-              { name: "Campus → Metro Mall", status: "Safe", time: "12 min" },
-              { name: "Campus → City Park", status: "Safe", time: "8 min" },
-              { name: "Late Night Route A", status: "Caution", time: "15 min" },
-              { name: "Campus → Hostel", status: "Safe", time: "5 min" },
-            ].map(r => (
-              <div key={r.name} className="flex items-center justify-between py-3" style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-                <div>
-                  <p className="text-sm text-white" style={{ fontWeight: 500 }}>{r.name}</p>
-                  <p className="text-xs" style={{ color: '#8888aa' }}>{r.time} walk</p>
-                </div>
-                <span className="text-xs px-2.5 py-1 rounded-full" style={r.status === "Safe" ? { background: 'rgba(6,214,160,0.15)', color: '#06d6a0', fontWeight: 700 } : { background: 'rgba(255,214,10,0.15)', color: '#ffd60a', fontWeight: 700 }}>
-                  {r.status === "Safe" ? "✓ Safe" : "⚠ Caution"}
-                </span>
-              </div>
-            ))}
-          </div>
-
-          <div className="rounded-2xl p-5" style={{ background: '#16162a', border: '1px solid rgba(255,255,255,0.06)' }}>
-            <div className="flex items-center justify-between mb-4">
-              <p className="text-sm text-white" style={{ fontFamily: 'var(--font-display)', fontWeight: 800 }}>Emergency Contacts 📞</p>
-              <button className="text-xs" style={{ color: '#c026d3', fontWeight: 700 }}>+ Add</button>
-            </div>
-            {[
-              { name: "Mom", phone: "+91 98765 43210", av: "M", grad: "from-[#f72585] to-[#c026d3]" },
-              { name: "Dad", phone: "+91 98765 43211", av: "D", grad: "from-[#7209b7] to-[#4361ee]" },
-              { name: "Campus Security", phone: "1800-CAM-SAFE", av: "CS", grad: "from-[#ff6b35] to-[#f72585]" },
-              { name: "Warden", phone: "+91 98765 00001", av: "W", grad: "from-[#06d6a0] to-[#4cc9f0]" },
-            ].map(c => (
-              <div key={c.name} className="flex items-center gap-3 py-3" style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-                <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-xs text-white bg-gradient-to-br ${c.grad} flex-shrink-0`} style={{ fontFamily: 'var(--font-display)', fontWeight: 800 }}>
-                  {c.av}
-                </div>
-                <div className="flex-1">
-                  <p className="text-sm text-white" style={{ fontWeight: 600 }}>{c.name}</p>
-                  <p className="text-xs" style={{ color: '#8888aa' }}>{c.phone}</p>
-                </div>
-                <button className="text-xs px-3 py-1 rounded-full text-white" style={{ background: 'linear-gradient(135deg, #f72585, #7209b7)', fontWeight: 700 }}>Call</button>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
+    </div>  
   );
 }

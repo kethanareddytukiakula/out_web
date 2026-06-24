@@ -1,5 +1,7 @@
 import { useState, useEffect } from "react";
 import { Play, Square, Clock, MapPin, DollarSign, Tag, Search, Filter, Utensils, ShoppingBag, Coffee, BookOpen, Music, AlertCircle, X, Activity, Zap } from "lucide-react";
+import { useAuth } from "../../context/AuthContext";
+import { saveOuting } from "../../services/outingService";
 
 const categoryIcons: Record<string, React.ElementType> = {
   Food: Utensils, Travel: MapPin, Shopping: ShoppingBag, Entertainment: Music, Study: BookOpen, Other: Tag,
@@ -18,7 +20,18 @@ const categoryTagColor: Record<string, { bg: string; text: string }> = {
   Other: { bg: "rgba(136,136,170,0.15)", text: "#8888aa" },
 };
 
-const outingHistory = [
+type OutingHistoryItem = {
+  id: number | string;
+  date: string;
+  startTime: string;
+  endTime: string;
+  duration: string;
+  amount: number;
+  category: string;
+  location: string;
+};
+
+const outingHistory: OutingHistoryItem[] = [
   { id: 1, date: "Today", startTime: "10:30 AM", endTime: "1:15 PM", duration: "2h 45m", amount: 380, category: "Food", location: "Campus Bites & Brew" },
   { id: 2, date: "Yesterday", startTime: "3:00 PM", endTime: "6:45 PM", duration: "3h 45m", amount: 520, category: "Shopping", location: "Metro Mall" },
   { id: 3, date: "Yesterday", startTime: "9:00 AM", endTime: "11:30 AM", duration: "2h 30m", amount: 0, category: "Study", location: "Central Library" },
@@ -38,10 +51,23 @@ function formatTime(seconds: number) {
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 }
 
-function SummaryModal({ elapsed, onSave, onSkip }: { elapsed: number; onSave: (a: number, c: string) => void; onSkip: () => void }) {
+function SummaryModal({ elapsed, onSave, onSkip }: { elapsed: number; onSave: (a: number, c: string, l: string) => void; onSkip: () => void }) {
   const [amount, setAmount] = useState("");
   const [category, setCategory] = useState("Food");
+  const [location, setLocation] = useState("");
+  const [locationError, setLocationError] = useState("");
   const categories = ["Food", "Travel", "Shopping", "Entertainment", "Study", "Other"];
+
+  const handleSubmit = () => {
+    const trimmedLocation = location.trim();
+    if (trimmedLocation.length < 2) {
+      setLocationError("Location must be at least 2 characters.");
+      return;
+    }
+    setLocationError("");
+    onSave(Number(amount) || 0, category, trimmedLocation);
+  };
+
   return (
     <div className="fixed inset-0 flex items-center justify-center z-50 p-4" style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)' }}>
       <div className="w-full max-w-md rounded-2xl p-6" style={{ background: '#16162a', border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 20px 60px rgba(247,37,133,0.2)' }}>
@@ -55,12 +81,26 @@ function SummaryModal({ elapsed, onSave, onSkip }: { elapsed: number; onSave: (a
           </button>
         </div>
         <div className="grid grid-cols-2 gap-3 mb-5">
-          {[{ label: "Duration", val: formatTime(elapsed) }, { label: "Location", val: "Campus Area" }].map(i => (
+          {[{ label: "Duration", val: formatTime(elapsed) }, { label: "Location", val: location || "Add location" }].map(i => (
             <div key={i.label} className="rounded-xl p-3" style={{ background: 'rgba(255,255,255,0.05)' }}>
               <p className="text-xs mb-1" style={{ color: '#8888aa' }}>{i.label}</p>
               <p className="text-white" style={{ fontFamily: 'var(--font-display)', fontWeight: 800 }}>{i.val}</p>
             </div>
           ))}
+        </div>
+        <div className="mb-4">
+          <label className="text-xs mb-2 block" style={{ color: '#8888aa', fontWeight: 600 }}>LOCATION</label>
+          <input list="location-options" type="text" placeholder="Central Library" value={location} onChange={e => { setLocation(e.target.value); setLocationError(""); }}
+            className="w-full rounded-xl px-4 py-3 text-white text-xl outline-none"
+            style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', fontFamily: 'var(--font-display)', fontWeight: 900 }} />
+          <datalist id="location-options">
+            <option value="Central Library" />
+            <option value="Metro Mall" />
+            <option value="Brew & Bean" />
+            <option value="VIT Main Gate" />
+            <option value="City Park" />
+          </datalist>
+          {locationError && <p className="text-[11px] mt-2" style={{ color: '#f72585' }}>{locationError}</p>}
         </div>
         <div className="mb-4">
           <label className="text-xs mb-2 block" style={{ color: '#8888aa', fontWeight: 600 }}>AMOUNT SPENT (₹)</label>
@@ -87,7 +127,7 @@ function SummaryModal({ elapsed, onSave, onSkip }: { elapsed: number; onSave: (a
         </div>
         <div className="flex gap-3">
           <button onClick={onSkip} className="flex-1 py-2.5 rounded-xl text-sm" style={{ background: 'rgba(255,255,255,0.06)', color: '#8888aa', fontWeight: 600 }}>Skip</button>
-          <button onClick={() => onSave(Number(amount) || 0, category)} className="flex-1 py-2.5 rounded-xl text-white text-sm" style={{ background: 'linear-gradient(135deg, #f72585, #7209b7)', fontFamily: 'var(--font-display)', fontWeight: 800 }}>Save ✨</button>
+          <button onClick={handleSubmit} className="flex-1 py-2.5 rounded-xl text-white text-sm" style={{ background: 'linear-gradient(135deg, #f72585, #7209b7)', fontFamily: 'var(--font-display)', fontWeight: 800 }}>Save ✨</button>
         </div>
       </div>
     </div>
@@ -114,10 +154,31 @@ export function OutingsScreen({ isOutingActive, outingStart, onStartOuting, onEn
     return () => clearInterval(interval);
   }, [isOutingActive, outingStart]);
 
-  const handleSave = (amount: number, category: string) => {
-    setHistory(prev => [{ id: Date.now(), date: "Today", startTime: "Now", endTime: "Just now", duration: formatTime(elapsed), amount, category, location: "Campus Area" }, ...prev]);
+  const { currentUser } = useAuth();
+
+  const handleSave = async (amount: number, category: string, location: string) => {
+    const newEntry: OutingHistoryItem = {
+      id: Date.now(),
+      date: "Today",
+      startTime: "Now",
+      endTime: "Just now",
+      duration: formatTime(elapsed),
+      amount,
+      category,
+      location,
+    };
+
+    setHistory(prev => [newEntry, ...prev]);
     setShowSummary(false);
     onEndOuting(amount, category);
+
+    if (!currentUser?.uid) return;
+
+    try {
+      await saveOuting(currentUser.uid, { location, category, amount });
+    } catch (err) {
+      console.error("Failed to save outing:", err);
+    }
   };
 
   const filtered = history.filter(o =>

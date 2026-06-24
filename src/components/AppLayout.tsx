@@ -1,17 +1,38 @@
-import { useState } from "react";
-import { LayoutDashboard, Route, Compass, Users, User, Zap, Bell, Search, Menu } from "lucide-react";
+import { useEffect, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
+import { LayoutDashboard, Route, Compass, Users, User, Zap, Bell, Search, Menu, Shield } from "lucide-react";
 import { HomeScreen } from "../app/components/HomeScreen";
 import { OutingsScreen } from "../app/components/OutingsScreen";
 import { ExploreScreen } from "../app/components/ExploreScreen";
 import { CommunityScreen } from "../app/components/CommunityScreen";
 import { ProfileScreen } from "../app/components/ProfileScreen";
+import { SafetyScreen } from "../app/components/SafetyScreen";
 import { useAuth } from "../context/AuthContext";
 
-type Tab = "home" | "outings" | "explore" | "community" | "profile";
+type Tab = "home" | "outings" | "safety" | "explore" | "community" | "profile";
+
+const routeToTab: Record<string, Tab> = {
+  "/dashboard": "home",
+  "/outings": "outings",
+  "/safety": "safety",
+  "/explore": "explore",
+  "/community": "community",
+  "/profile": "profile",
+};
+
+const tabToRoute: Record<Tab, string> = {
+  home: "/dashboard",
+  outings: "/outings",
+  safety: "/safety",
+  explore: "/explore",
+  community: "/community",
+  profile: "/profile",
+};
 
 const navItems: { id: Tab; label: string; icon: React.ElementType; emoji: string }[] = [
   { id: "home", label: "Dashboard", icon: LayoutDashboard, emoji: "🏠" },
   { id: "outings", label: "Outings", icon: Route, emoji: "🚀" },
+  { id: "safety", label: "Safety", icon: Shield, emoji: "🔒" },
   { id: "explore", label: "Explore", icon: Compass, emoji: "🗺️" },
   { id: "community", label: "Community", icon: Users, emoji: "💬" },
   { id: "profile", label: "Profile", icon: User, emoji: "⚡" },
@@ -20,22 +41,30 @@ const navItems: { id: Tab; label: string; icon: React.ElementType; emoji: string
 const navGradients: Record<Tab, string> = {
   home: "from-[#f72585] to-[#c026d3]",
   outings: "from-[#7209b7] to-[#4361ee]",
+  safety: "from-[#ff6b35] to-[#f72585]",
   explore: "from-[#4cc9f0] to-[#4361ee]",
   community: "from-[#f72585] to-[#ff6b35]",
   profile: "from-[#06d6a0] to-[#4cc9f0]",
 };
 
 export default function AppLayout() {
-  const { currentUser } = useAuth();
+  const { currentUser, loading } = useAuth();
+  const location = useLocation();
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<Tab>("home");
   const [isOutingActive, setIsOutingActive] = useState(false);
   const [outingStart, setOutingStart] = useState<Date | null>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
 
+  useEffect(() => {
+    const tab = routeToTab[location.pathname] || "home";
+    setActiveTab(tab);
+  }, [location.pathname]);
+
   const handleStartOuting = () => {
     setIsOutingActive(true);
     setOutingStart(new Date());
-    setActiveTab("outings");
+    navigate("/outings");
   };
 
   const handleEndOuting = (_amount: number, _category: string) => {
@@ -44,13 +73,15 @@ export default function AppLayout() {
   };
 
   const handleNavigate = (tab: string) => {
-    setActiveTab(tab as Tab);
+    const nextTab = tab as Tab;
+    navigate(tabToRoute[nextTab]);
   };
 
   const renderScreen = () => {
     switch (activeTab) {
       case "home": return <HomeScreen onNavigate={handleNavigate} onStartOuting={handleStartOuting} />;
       case "outings": return <OutingsScreen isOutingActive={isOutingActive} outingStart={outingStart} onStartOuting={handleStartOuting} onEndOuting={handleEndOuting} />;
+      case "safety": return <SafetyScreen />;
       case "explore": return <ExploreScreen />;
       case "community": return <CommunityScreen />;
       case "profile": return <ProfileScreen />;
@@ -58,8 +89,8 @@ export default function AppLayout() {
   };
 
   // Generate initials from user name
-  const userInitials = currentUser ? currentUser.name.split(' ').map(n => n[0]).slice(0, 2).join('') : 'AS';
-  const userCourseYear = currentUser ? `${currentUser.course} · ${currentUser.year}` : 'CSE · 3rd Year';
+  const userInitials = loading ? '...' : (currentUser ? currentUser.name.split(' ').map(n => n[0]).slice(0, 2).join('') : 'AS');
+  const userCourseYear = loading ? 'Loading...' : (currentUser ? `${currentUser.course} · ${currentUser.year}` : 'CSE · 3rd Year');
 
   return (
     <div className="size-full flex" style={{ fontFamily: 'var(--font-body)', background: '#0d0d1a' }}>
@@ -89,7 +120,10 @@ export default function AppLayout() {
             return (
               <button
                 key={item.id}
-                onClick={() => setActiveTab(item.id)}
+                onClick={() => {
+                  setActiveTab(item.id);
+                  navigate(tabToRoute[item.id]);
+                }}
                 className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-2xl text-left transition-all duration-200 group relative overflow-hidden md:justify-center lg:justify-start ${active ? 'text-white' : 'text-[#8888aa] hover:text-white hover:bg-white/5'}`}
                 style={active ? { background: 'rgba(255,255,255,0.08)' } : {}}
               >
@@ -149,7 +183,7 @@ export default function AppLayout() {
               return (
                 <button
                   key={item.id}
-                  onClick={() => { setActiveTab(item.id); setMobileOpen(false); }}
+                  onClick={() => { setActiveTab(item.id); setMobileOpen(false); navigate(tabToRoute[item.id]); }}
                   className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-2xl text-left transition-all duration-200 group relative overflow-hidden ${active ? 'text-white' : 'text-[#8888aa] hover:text-white hover:bg-white/5'}`}
                   style={active ? { background: 'rgba(255,255,255,0.08)' } : {}}
                 >
