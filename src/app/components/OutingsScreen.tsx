@@ -1,7 +1,9 @@
 import { useState, useEffect } from "react";
 import { Play, Square, Clock, MapPin, DollarSign, Tag, Search, Filter, Utensils, ShoppingBag, Coffee, BookOpen, Music, AlertCircle, X, Activity, Zap } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
-import { saveOuting } from "../../services/outingService";
+import { getOutingsForUser, updateOuting } from "../../services/outingService";
+import { saveExpense, getExpensesForUser } from "../../services/expenseService";
+import { Timestamp } from "firebase/firestore";
 
 const categoryIcons: Record<string, React.ElementType> = {
   Food: Utensils, Travel: MapPin, Shopping: ShoppingBag, Entertainment: Music, Study: BookOpen, Other: Tag,
@@ -23,6 +25,7 @@ const categoryTagColor: Record<string, { bg: string; text: string }> = {
 type OutingHistoryItem = {
   id: number | string;
   date: string;
+  rawDate: Date;
   startTime: string;
   endTime: string;
   duration: string;
@@ -30,17 +33,6 @@ type OutingHistoryItem = {
   category: string;
   location: string;
 };
-
-const outingHistory: OutingHistoryItem[] = [
-  { id: 1, date: "Today", startTime: "10:30 AM", endTime: "1:15 PM", duration: "2h 45m", amount: 380, category: "Food", location: "Campus Bites & Brew" },
-  { id: 2, date: "Yesterday", startTime: "3:00 PM", endTime: "6:45 PM", duration: "3h 45m", amount: 520, category: "Shopping", location: "Metro Mall" },
-  { id: 3, date: "Yesterday", startTime: "9:00 AM", endTime: "11:30 AM", duration: "2h 30m", amount: 0, category: "Study", location: "Central Library" },
-  { id: 4, date: "Jun 7", startTime: "5:00 PM", endTime: "9:00 PM", duration: "4h 00m", amount: 1200, category: "Entertainment", location: "CineMax IMAX" },
-  { id: 5, date: "Jun 6", startTime: "11:00 AM", endTime: "2:00 PM", duration: "3h 00m", amount: 450, category: "Food", location: "Street Food Hub" },
-  { id: 6, date: "Jun 5", startTime: "6:30 PM", endTime: "8:00 PM", duration: "1h 30m", amount: 200, category: "Travel", location: "City Park" },
-  { id: 7, date: "Jun 4", startTime: "2:00 PM", endTime: "5:30 PM", duration: "3h 30m", amount: 660, category: "Shopping", location: "Central Square" },
-  { id: 8, date: "Jun 3", startTime: "7:00 PM", endTime: "10:00 PM", duration: "3h 00m", amount: 400, category: "Entertainment", location: "Bowling Alley" },
-];
 
 const filters = ["All Time", "Today", "This Week", "This Month"];
 
@@ -135,16 +127,16 @@ function SummaryModal({ elapsed, onSave, onSkip }: { elapsed: number; onSave: (a
 }
 
 interface OutingsScreenProps {
-  isOutingActive: boolean; outingStart: Date | null;
+  isOutingActive: boolean; outingStart: Date | null; activeOutingId: string | null;
   onStartOuting: () => void; onEndOuting: (amount: number, category: string) => void;
 }
 
-export function OutingsScreen({ isOutingActive, outingStart, onStartOuting, onEndOuting }: OutingsScreenProps) {
+export function OutingsScreen({ isOutingActive, outingStart, activeOutingId, onStartOuting, onEndOuting }: OutingsScreenProps) {
   const [elapsed, setElapsed] = useState(0);
   const [activeFilter, setActiveFilter] = useState("All Time");
   const [searchQuery, setSearchQuery] = useState("");
   const [showSummary, setShowSummary] = useState(false);
-  const [history, setHistory] = useState(outingHistory);
+  const [history, setHistory] = useState<OutingHistoryItem[]>([]);
 
   useEffect(() => {
     let interval: ReturnType<typeof setInterval>;
@@ -156,41 +148,158 @@ export function OutingsScreen({ isOutingActive, outingStart, onStartOuting, onEn
 
   const { currentUser } = useAuth();
 
-  const handleSave = async (amount: number, category: string, location: string) => {
-    const newEntry: OutingHistoryItem = {
-      id: Date.now(),
-      date: "Today",
-      startTime: "Now",
-      endTime: "Just now",
-      duration: formatTime(elapsed),
-      amount,
-      category,
-      location,
-    };
-
-    setHistory(prev => [newEntry, ...prev]);
-    setShowSummary(false);
-    onEndOuting(amount, category);
-
+  const loadOutingsHistory = async () => {
     if (!currentUser?.uid) return;
-
     try {
-      await saveOuting(currentUser.uid, { location, category, amount });
+      const userOutings = await getOutingsForUser(currentUser.uid);
+      const userExpenses = await getExpensesForUser(currentUser.uid);
+
+      // Create a map from outingId to expense amount
+      const expenseMap: Record<string, number> = {};
+      userExpenses.forEach(exp => {
+        if (exp.outingId) {
+          expenseMap[exp.outingId] = exp.amount;
+        }
+      
+      });
+        console.log("UID:", currentUser?.uid);
+        console.log("Outings:", userOutings);
+        console.log("Expenses:", userExpenses);
+
+      // Map outings to OutingHistoryItem format
+      const formattedHistory: OutingHistoryItem[] = userOutings
+        .filter(o => o.status === "completed")
+        .map(o => {
+          // format duration
+          const h = Math.floor(o.duration / 3600);
+          const m = Math.floor((o.duration % 3600) / 60);
+          const durationStr = h > 0 ? `${h}h ${m}m` : `${m}m`;
+
+          // format date
+          const startDate = o.startTime.toDate();
+          const today = new Date();
+          const yesterday = new Date();
+          yesterday.setDate(today.getDate() - 1);
+
+          let dateStr = "";
+          if (startDate.toDateString() === today.toDateString()) {
+            dateStr = "Today";
+          } else if (startDate.toDateString() === yesterday.toDateString()) {
+            dateStr = "Yesterday";
+          } else {
+            dateStr = startDate.toLocaleDateString([], { month: 'short', day: 'numeric' });
+          }
+
+          // format startTime and endTime
+          const startTimeStr = startDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+          const endTimeStr = o.endTime ? o.endTime.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "";
+
+          return {
+            id: o.id,
+            date: dateStr,
+            rawDate: startDate,
+            startTime: startTimeStr,
+            endTime: endTimeStr,
+            duration: durationStr,
+            amount: expenseMap[o.id] || 0,
+            category: o.category || "Other",
+            location: o.location || "Unknown Location",
+          };
+        });
+
+      setHistory(formattedHistory);
     } catch (err) {
-      console.error("Failed to save outing:", err);
+      console.error("Failed to load outings history:", err);
     }
   };
 
-  const filtered = history.filter(o =>
-    o.location.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    o.category.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  useEffect(() => {
+    loadOutingsHistory();
+  }, [currentUser]);
+
+  const handleSave = async (amount: number, category: string, location: string) => {
+    if (!currentUser?.uid || !activeOutingId) return;
+
+    try {
+      // 1. Update active outing doc in Firestore
+      await updateOuting(activeOutingId, {
+        location,
+        category,
+        endTime: Timestamp.now(),
+        duration: elapsed,
+        status: "completed",
+      });
+
+      // 2. Save expense in Firestore if amount > 0
+      if (amount > 0) {
+        await saveExpense(currentUser.uid, {
+          outingId: activeOutingId,
+          category,
+          amount,
+          note: `Outing at ${location}`,
+        });
+      }
+
+      setShowSummary(false);
+      onEndOuting(amount, category);
+      await loadOutingsHistory();
+    } catch (err) {
+      console.error("Failed to save outing/expense:", err);
+    }
+  };
+
+  const handleSkip = async () => {
+    if (!currentUser?.uid || !activeOutingId) return;
+    try {
+      await updateOuting(activeOutingId, {
+        location: "Unknown Location",
+        category: "Other",
+        endTime: Timestamp.now(),
+        duration: elapsed,
+        status: "completed",
+      });
+      setShowSummary(false);
+      onEndOuting(0, "Other");
+      await loadOutingsHistory();
+    } catch (err) {
+      console.error("Failed to skip active outing:", err);
+    }
+  };
+
+  const filtered = history.filter(o => {
+    const matchesSearch = o.location.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      o.category.toLowerCase().includes(searchQuery.toLowerCase());
+
+    if (!matchesSearch) return false;
+
+    if (activeFilter === "All Time") return true;
+
+    const now = new Date();
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+    if (activeFilter === "Today") {
+      return o.rawDate >= startOfToday;
+    }
+
+    if (activeFilter === "This Week") {
+      const oneWeekAgo = new Date();
+      oneWeekAgo.setDate(now.getDate() - 7);
+      return o.rawDate >= oneWeekAgo;
+    }
+
+    if (activeFilter === "This Month") {
+      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      return o.rawDate >= startOfMonth;
+    }
+
+    return true;
+  });
 
   const totalSpent = filtered.reduce((s, o) => s + o.amount, 0);
 
   return (
     <div className="h-full overflow-y-auto p-6" style={{ background: '#0d0d1a' }}>
-      {showSummary && <SummaryModal elapsed={elapsed} onSave={handleSave} onSkip={() => { setShowSummary(false); onEndOuting(0, "Other"); }} />}
+      {showSummary && <SummaryModal elapsed={elapsed} onSave={handleSave} onSkip={handleSkip} />}
 
       <div className="grid grid-cols-3 gap-6">
         {/* Left: Tracker */}

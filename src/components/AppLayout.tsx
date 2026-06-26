@@ -8,6 +8,8 @@ import { CommunityScreen } from "../app/components/CommunityScreen";
 import { ProfileScreen } from "../app/components/ProfileScreen";
 import { SafetyScreen } from "../app/components/SafetyScreen";
 import { useAuth } from "../context/AuthContext";
+import { saveOuting, getActiveOutingForUser } from "../services/outingService";
+import { Timestamp } from "firebase/firestore";
 
 type Tab = "home" | "outings" | "safety" | "explore" | "community" | "profile";
 
@@ -54,6 +56,7 @@ export default function AppLayout() {
   const [activeTab, setActiveTab] = useState<Tab>("home");
   const [isOutingActive, setIsOutingActive] = useState(false);
   const [outingStart, setOutingStart] = useState<Date | null>(null);
+  const [activeOutingId, setActiveOutingId] = useState<string | null>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
 
   useEffect(() => {
@@ -61,15 +64,61 @@ export default function AppLayout() {
     setActiveTab(tab);
   }, [location.pathname]);
 
-  const handleStartOuting = () => {
-    setIsOutingActive(true);
-    setOutingStart(new Date());
-    navigate("/outings");
+  // Restore active outing state from Firestore on load or when user changes
+  useEffect(() => {
+    if (loading) return;
+    if (!currentUser) {
+      setIsOutingActive(false);
+      setOutingStart(null);
+      setActiveOutingId(null);
+      return;
+    }
+
+    const restoreActiveOuting = async () => {
+      try {
+        const activeOuting = await getActiveOutingForUser(currentUser.uid);
+        if (activeOuting) {
+          setIsOutingActive(true);
+          setOutingStart(activeOuting.startTime.toDate());
+          setActiveOutingId(activeOuting.id);
+        } else {
+          setIsOutingActive(false);
+          setOutingStart(null);
+          setActiveOutingId(null);
+        }
+      } catch (err) {
+        console.error("Failed to restore active outing:", err);
+      }
+    };
+
+    restoreActiveOuting();
+  }, [currentUser, loading]);
+
+  const handleStartOuting = async () => {
+    if (!currentUser) return;
+    try {
+      const now = Timestamp.now();
+      const docId = await saveOuting(currentUser.uid, {
+        location: "",
+        category: "",
+        startTime: now,
+        endTime: null,
+        duration: 0,
+        status: "active",
+      });
+      setActiveOutingId(docId);
+      setIsOutingActive(true);
+      setOutingStart(now.toDate());
+      navigate("/outings");
+    } catch (err) {
+      console.error("Failed to start outing in Firestore:", err);
+    }
   };
 
   const handleEndOuting = (_amount: number, _category: string) => {
     setIsOutingActive(false);
     setOutingStart(null);
+    setActiveOutingId(null);
   };
 
   const handleNavigate = (tab: string) => {
@@ -80,7 +129,7 @@ export default function AppLayout() {
   const renderScreen = () => {
     switch (activeTab) {
       case "home": return <HomeScreen onNavigate={handleNavigate} onStartOuting={handleStartOuting} />;
-      case "outings": return <OutingsScreen isOutingActive={isOutingActive} outingStart={outingStart} onStartOuting={handleStartOuting} onEndOuting={handleEndOuting} />;
+      case "outings": return <OutingsScreen isOutingActive={isOutingActive} outingStart={outingStart} activeOutingId={activeOutingId} onStartOuting={handleStartOuting} onEndOuting={handleEndOuting} />;
       case "safety": return <SafetyScreen />;
       case "explore": return <ExploreScreen />;
       case "community": return <CommunityScreen />;
