@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Search, Star, Users, MapPin, Coffee, Utensils, BookOpen, ShoppingBag, Music, Trees, Zap, Navigation, X } from "lucide-react";
+import { places, type Place } from "../../data/places";
 
 const categories = [
   { label: "All", icon: Zap, grad: "from-[#f72585] to-[#7209b7]" },
@@ -11,14 +12,53 @@ const categories = [
   { label: "Fun", icon: Music, grad: "from-[#f72585] to-[#ff6b35]" },
 ];
 
-const hotspots = [
-  { id: 1, name: "Brew & Bean Café", category: "Cafés", rating: 4.8, crowd: "Moderate", crowdPct: 55, distance: "0.4 km", reviews: 234, trending: true, hidden: false, tags: ["WiFi", "Quiet", "AC"], image: "https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?w=400&h=200&fit=crop&auto=format", desc: "Popular among students for its strong coffee and fast WiFi. Great for study sessions.", popularity: 92, grad: "from-[#ff6b35] to-[#f72585]" },
-  { id: 2, name: "The Study Loft", category: "Study", rating: 4.6, crowd: "Low", crowdPct: 25, distance: "0.7 km", reviews: 189, trending: false, hidden: true, tags: ["Silent", "Outlets", "AC"], image: "https://images.unsplash.com/photo-1481627834876-b7833e8f5570?w=400&h=200&fit=crop&auto=format", desc: "Hidden gem — a three-floor library-style café with dedicated study pods.", popularity: 78, grad: "from-[#06d6a0] to-[#4cc9f0]" },
-  { id: 3, name: "Campus Bites", category: "Food", rating: 4.5, crowd: "High", crowdPct: 85, distance: "0.2 km", reviews: 512, trending: true, hidden: false, tags: ["Budget", "Fast", "Veg"], image: "https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=400&h=200&fit=crop&auto=format", desc: "Most visited food joint near campus. Known for quick bites and student-friendly prices.", popularity: 97, grad: "from-[#f72585] to-[#c026d3]" },
-  { id: 4, name: "Metro Mall", category: "Malls", rating: 4.3, crowd: "High", crowdPct: 78, distance: "1.2 km", reviews: 890, trending: true, hidden: false, tags: ["Shopping", "Food Court", "Movies"], image: "https://images.unsplash.com/photo-1555529669-e69e7aa0ba9a?w=400&h=200&fit=crop&auto=format", desc: "The go-to weekend destination with over 200 stores, cinema, and a massive food court.", popularity: 88, grad: "from-[#7209b7] to-[#c026d3]" },
-  { id: 5, name: "Green Valley Park", category: "Parks", rating: 4.7, crowd: "Low", crowdPct: 20, distance: "0.9 km", reviews: 145, trending: false, hidden: true, tags: ["Outdoor", "Quiet", "Free"], image: "https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=400&h=200&fit=crop&auto=format", desc: "A serene park with jogging tracks and shaded benches. Perfect for a quiet afternoon.", popularity: 65, grad: "from-[#06d6a0] to-[#4361ee]" },
-  { id: 6, name: "CineMax IMAX", category: "Fun", rating: 4.4, crowd: "Moderate", crowdPct: 60, distance: "1.5 km", reviews: 320, trending: false, hidden: false, tags: ["Movies", "IMAX", "AC"], image: "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=400&h=200&fit=crop&auto=format", desc: "Best IMAX experience in the area. Student discounts available on weekdays.", popularity: 82, grad: "from-[#f72585] to-[#ff6b35]" },
-];
+const placeCategoryLabel = (cat: Place["category"]): string => {
+  if (cat === "Cafe") return "Cafés";
+  if (cat === "Food") return "Food";
+  return "Fun";
+};
+
+const placeGrad = (cat: Place["category"]): string => {
+  if (cat === "Cafe") return "from-[#ff6b35] to-[#f72585]";
+  if (cat === "Food") return "from-[#f72585] to-[#c026d3]";
+  return "from-[#f72585] to-[#ff6b35]";
+};
+
+type HotspotCard = {
+  id: string;
+  name: string;
+  category: string;
+  rating: number;
+  crowd: string;
+  crowdPct: number;
+  distance: string;
+  reviews: number;
+  trending: boolean;
+  hidden: boolean;
+  tags: string[];
+  image: string;
+  desc: string;
+  popularity: number;
+  grad: string;
+};
+
+const hotspots: HotspotCard[] = places.map((p, idx) => ({
+  id: p.id,
+  name: p.name,
+  category: placeCategoryLabel(p.category),
+  rating: p.rating,
+  crowd: idx % 3 === 0 ? "Low" : idx % 3 === 1 ? "Moderate" : "High",
+  crowdPct: idx % 3 === 0 ? 25 : idx % 3 === 1 ? 55 : 85,
+  distance: p.distance,
+  reviews: 100 + idx * 37,
+  trending: idx % 2 === 0,
+  hidden: idx % 2 === 1,
+  tags: p.tags ?? [],
+  image: p.image ?? "",
+  desc: p.description,
+  popularity: 60 + ((p.rating * 10) | 0) % 35,
+  grad: placeGrad(p.category),
+}));
 
 const mapAreas = [
   { label: "Library", x: 20, y: 25, level: "low", students: 12 },
@@ -41,12 +81,41 @@ export function ExploreScreen() {
   const [view, setView] = useState<View>("hotspots");
   const [activeCategory, setActiveCategory] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
-  const [selected, setSelected] = useState<typeof hotspots[0] | null>(null);
+  const [selected, setSelected] = useState<HotspotCard | null>(null);
+
+  const normalizedQuery = searchQuery.trim().toLowerCase();
+
+  const categoryAliases: Record<string, Place["category"]> = {
+    cafe: "Cafe", cafes: "Cafe", café: "Cafe", cafés: "Cafe", coffee: "Cafe", hookah: "Cafe", shisha: "Cafe",
+    food: "Food", restaurant: "Food", restaurants: "Food", biryani: "Food", nonveg: "Food", veg: "Food",
+    fun: "Fun", tourist: "Fun", tourism: "Fun", sightseeing: "Fun", heritage: "Fun", temple: "Fun", fort: "Fun",
+  };
+
+  const isAffordable = (p: Place) => p.budget > 0 && p.budget <= 200;
+  const isFree = (p: Place) => p.budget === 0;
+
+  const matchSearch = (h: HotspotCard, p: Place): boolean => {
+    if (!normalizedQuery) return true;
+    const aliasCategory = categoryAliases[normalizedQuery];
+    if (aliasCategory && p.category === aliasCategory) return true;
+    if (normalizedQuery === "budget" || normalizedQuery === "cheap" || normalizedQuery === "affordable") {
+      return isAffordable(p) || isFree(p);
+    }
+    if (normalizedQuery === "free") return isFree(p);
+    const haystacks = [
+      h.name.toLowerCase(),
+      p.category.toLowerCase(),
+      p.description.toLowerCase(),
+      h.category.toLowerCase(),
+      ...(p.tags ?? []).map(t => t.toLowerCase()),
+    ];
+    return haystacks.some(text => text.includes(normalizedQuery));
+  };
 
   const filtered = hotspots.filter(h => {
     const matchCat = activeCategory === "All" || h.category === activeCategory;
-    const matchSearch = h.name.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchCat && matchSearch;
+    const matchHit = matchSearch(h, places.find(p => p.id === h.id)!);
+    return matchCat && matchHit;
   });
 
   return (
@@ -142,39 +211,77 @@ export function ExploreScreen() {
       </div>
 
       {view === "hotspots" ? (
-        <div className="grid grid-cols-3 gap-4">
-          {filtered.map(place => {
-            const cs = crowdStyle(place.crowd);
+        <div className="space-y-7">
+          {([
+            { key: "Fun" as Place["category"], emoji: "🏛", title: "Fun & Tourist Places" },
+            { key: "Food" as Place["category"], emoji: "🍽", title: "Food" },
+            { key: "Cafe" as Place["category"], emoji: "☕", title: "Cafés" },
+          ]).map(section => {
+            const sectionPlaces = filtered.filter(h => places.find(p => p.id === h.id)?.category === section.key);
+            if (sectionPlaces.length === 0) return null;
             return (
-              <button key={place.id} onClick={() => setSelected(place)} className="rounded-2xl overflow-hidden text-left hover:scale-[1.02] transition-all group" style={{ background: '#16162a', border: '1px solid rgba(255,255,255,0.06)' }}>
-                <div className="relative overflow-hidden">
-                  <img src={place.image} alt={place.name} className="w-full h-36 object-cover group-hover:scale-110 transition-transform duration-500" />
-                  <div className="absolute inset-0" style={{ background: 'linear-gradient(to top, rgba(22,22,42,0.7) 0%, transparent 50%)' }} />
-                  <div className="absolute top-2 right-2 flex gap-1.5">
-                    {place.trending && <span className="text-[10px] px-1.5 py-0.5 rounded-full text-white" style={{ background: 'linear-gradient(135deg, #f72585, #7209b7)', fontWeight: 700 }}>🔥</span>}
-                    {place.hidden && <span className="text-[10px] px-1.5 py-0.5 rounded-full text-white" style={{ background: 'linear-gradient(135deg, #7209b7, #4361ee)', fontWeight: 700 }}>💎</span>}
-                  </div>
-                  <div className="absolute bottom-2 left-3 flex items-center gap-1">
-                    <Star size={11} className="text-[#ffd60a] fill-[#ffd60a]" />
-                    <span className="text-xs text-white" style={{ fontWeight: 700 }}>{place.rating}</span>
-                  </div>
+              <div key={section.key}>
+                <div className="flex items-center gap-3 mb-4">
+                  <span className="text-2xl">{section.emoji}</span>
+                  <h3 style={{ fontFamily: 'var(--font-display)', fontWeight: 900, fontSize: 18, color: '#f0f0ff', letterSpacing: '-0.01em' }}>{section.title}</h3>
+                  <div className="flex-1 h-px" style={{ background: 'linear-gradient(90deg, rgba(247,37,133,0.35), rgba(114,9,183,0.1), transparent)' }} />
+                  <span className="text-xs px-2.5 py-1 rounded-full" style={{ background: 'rgba(255,255,255,0.06)', color: '#8888aa', fontWeight: 700 }}>{sectionPlaces.length} spots</span>
                 </div>
-                <div className="p-3">
-                  <p className="text-sm text-white mb-1 truncate" style={{ fontFamily: 'var(--font-display)', fontWeight: 800 }}>{place.name}</p>
-                  <p className="text-xs mb-2" style={{ color: '#8888aa' }}>{place.distance} · {place.reviews} reviews</p>
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: cs.bg, color: cs.text, fontWeight: 700 }}>{place.crowd}</span>
-                    <div className="flex items-center gap-1">
-                      <div className="w-12 h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.1)' }}>
-                        <div className="h-full rounded-full" style={{ width: `${place.popularity}%`, background: `linear-gradient(90deg, #f72585, #7209b7)` }} />
-                      </div>
-                      <span className="text-[10px]" style={{ color: '#8888aa' }}>{place.popularity}%</span>
-                    </div>
-                  </div>
+                <div className="grid grid-cols-3 gap-4">
+                  {sectionPlaces.map(place => {
+                    const cs = crowdStyle(place.crowd);
+                    return (
+                      <button key={place.id} onClick={() => setSelected(place)} className="rounded-2xl overflow-hidden text-left hover:scale-[1.02] transition-all group" style={{ background: '#16162a', border: '1px solid rgba(255,255,255,0.06)' }}>
+                        <div className="relative overflow-hidden">
+                          <img src={place.image} alt={place.name} className="w-full h-36 object-cover group-hover:scale-110 transition-transform duration-500" />
+                          <div className="absolute inset-0" style={{ background: 'linear-gradient(to top, rgba(22,22,42,0.7) 0%, transparent 50%)' }} />
+                          <div className="absolute top-2 right-2 flex gap-1.5">
+                            {place.trending && <span className="text-[10px] px-1.5 py-0.5 rounded-full text-white" style={{ background: 'linear-gradient(135deg, #f72585, #7209b7)', fontWeight: 700 }}>🔥</span>}
+                            {place.hidden && <span className="text-[10px] px-1.5 py-0.5 rounded-full text-white" style={{ background: 'linear-gradient(135deg, #7209b7, #4361ee)', fontWeight: 700 }}>💎</span>}
+                          </div>
+                          <div className="absolute bottom-2 left-3 flex items-center gap-1">
+                            <Star size={11} className="text-[#ffd60a] fill-[#ffd60a]" />
+                            <span className="text-xs text-white" style={{ fontWeight: 700 }}>{place.rating}</span>
+                          </div>
+                        </div>
+                        <div className="p-3">
+                          <p className="text-sm text-white mb-1 truncate" style={{ fontFamily: 'var(--font-display)', fontWeight: 800 }}>{place.name}</p>
+                          <p className="text-xs mb-2" style={{ color: '#8888aa' }}>{place.distance} · {place.reviews} reviews</p>
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: cs.bg, color: cs.text, fontWeight: 700 }}>{place.crowd}</span>
+                            <div className="flex items-center gap-1">
+                              <div className="w-12 h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.1)' }}>
+                                <div className="h-full rounded-full" style={{ width: `${place.popularity}%`, background: `linear-gradient(90deg, #f72585, #7209b7)` }} />
+                              </div>
+                              <span className="text-[10px]" style={{ color: '#8888aa' }}>{place.popularity}%</span>
+                            </div>
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })}
                 </div>
-              </button>
+              </div>
             );
           })}
+          {filtered.length === 0 && (
+            <div className="rounded-2xl flex flex-col items-center justify-center text-center py-16 px-6" style={{ background: '#16162a', border: '1px solid rgba(255,255,255,0.06)', boxShadow: '0 4px 24px rgba(247,37,133,0.08)' }}>
+              <div className="relative mb-5">
+                <div className="absolute inset-0 rounded-full" style={{ background: 'radial-gradient(circle, rgba(247,37,133,0.25) 0%, transparent 70%)', filter: 'blur(18px)' }} />
+                <div className="relative w-20 h-20 rounded-2xl flex items-center justify-center" style={{ background: 'linear-gradient(135deg, rgba(247,37,133,0.15), rgba(114,9,183,0.15))', border: '1px solid rgba(247,37,133,0.3)' }}>
+                  <Search size={32} style={{ color: '#f72585' }} />
+                </div>
+              </div>
+              <h3 style={{ fontFamily: 'var(--font-display)', fontWeight: 900, fontSize: 22, color: '#f0f0ff', letterSpacing: '-0.01em' }}>No places found</h3>
+              <p className="text-sm mt-2 max-w-md" style={{ color: '#8888aa', lineHeight: 1.6 }}>
+                We couldn't find anything matching <span style={{ color: '#f72585', fontWeight: 700 }}>"{searchQuery}"</span>. Try a different keyword or browse all categories.
+              </p>
+              <button onClick={() => setSearchQuery("")} className="mt-6 px-5 py-2.5 rounded-xl text-sm text-white transition-all hover:scale-105"
+                style={{ background: 'linear-gradient(135deg, #f72585, #7209b7)', fontFamily: 'var(--font-display)', fontWeight: 800 }}>
+                Clear search
+              </button>
+            </div>
+          )}
         </div>
       ) : (
         <div className="grid grid-cols-3 gap-4">
